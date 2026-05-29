@@ -28,6 +28,8 @@ public class SalesReportDetailsResponseDto {
 	    private List<SalesReportItemResponseDto> items;
 	    private List<SalesReportExpenseResponseDto> expenses;
 	
+	    private String containerNumber;
+	    
 	    public SalesReportDetailsResponseDto() {
 			// TODO Auto-generated constructor stub
 		}
@@ -172,6 +174,14 @@ public class SalesReportDetailsResponseDto {
 
 		public void setExpenses(List<SalesReportExpenseResponseDto> expenses) {
 			this.expenses = expenses;
+		}
+
+		public String getContainerNumber() {
+			return containerNumber;
+		}
+
+		public void setContainerNumber(String containerNumber) {
+			this.containerNumber = containerNumber;
 		}
 	    
 	    

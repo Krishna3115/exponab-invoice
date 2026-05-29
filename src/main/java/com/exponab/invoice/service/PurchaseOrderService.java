@@ -54,6 +54,14 @@ public class PurchaseOrderService {
 	        po.setPaymentTerms(request.getPaymentTerms());
 	        po.setDeliveryTerms(request.getDeliveryTerms());
 
+	        po.setCommodity(request.getCommodity());
+	        po.setQuality(request.getQuality());
+	        po.setPackaging(request.getPackaging());
+	        po.setTotalQuantity(request.getTotalQuantity());
+	        po.setPriceNote(request.getPriceNote());
+	        po.setCurrency(request.getCurrency());
+	        po.setExchangeRate(request.getExchangeRate());
+	        
 	        po.setStatus(PurchaseOrderStatus.CREATED);
 
 	        List<PurchaseOrderItem> items = new ArrayList<>();

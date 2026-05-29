@@ -77,6 +77,9 @@ public class SalesReport {
 
 	    private String currencySymbol;
 	    
+	    @Column(name = "container_number", nullable = false, length = 100)
+	    private String containerNumber;
+	    
 	    public SalesReport() {
 			// TODO Auto-generated constructor stub
 		}
@@ -85,7 +88,7 @@ public class SalesReport {
 				ProcurementType procurementType, PurchaseOrder purchaseOrder, TaxMode taxMode, BigDecimal subtotal,
 				BigDecimal taxAmount, BigDecimal grandTotal, String notes, List<SalesReportItem> items,
 				List<SalesReportExpense> expenses, BigDecimal expenseTotal, BigDecimal finalPayable, String currency,
-				String currencySymbol) {
+				String currencySymbol, String containerNumber) {
 			super();
 			this.id = id;
 			this.reportNumber = reportNumber;
@@ -104,6 +107,7 @@ public class SalesReport {
 			this.finalPayable = finalPayable;
 			this.currency = currency;
 			this.currencySymbol = currencySymbol;
+			this.containerNumber = containerNumber;
 		}
 
 		public Long getId() {
@@ -242,6 +246,13 @@ public class SalesReport {
 			this.currencySymbol = currencySymbol;
 		}
 
+		public String getContainerNumber() {
+			return containerNumber;
+		}
+
+		public void setContainerNumber(String containerNumber) {
+			this.containerNumber = containerNumber;
+		}
+
 		
-	    
 }

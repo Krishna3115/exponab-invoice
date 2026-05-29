@@ -6,8 +6,10 @@ import com.exponab.invoice.dto.response.SalesReportExpenseDto;
 import com.exponab.invoice.entity.ProcurementType;
 import com.exponab.invoice.entity.TaxMode;
 
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 public class SalesReportRequestDto {
 
@@ -30,11 +32,17 @@ public class SalesReportRequestDto {
 
 	    private List<SalesReportExpenseDto> expenses;
 	    
+	    @NotBlank(message = "Container No. is required")
+	    @Size(max = 100)
+	    private String containerNumber;
+	    
 	    public SalesReportRequestDto() {
 	    }
 
-		public SalesReportRequestDto(Long customerId, ProcurementType procurementType, Long purchaseOrderId,
-				TaxMode taxMode, String notes, List<SalesReportItemDto> items, List<SalesReportExpenseDto> expenses) {
+		public SalesReportRequestDto(@NotNull Long customerId, @NotNull ProcurementType procurementType,
+				Long purchaseOrderId, @NotNull TaxMode taxMode, String notes, @NotEmpty List<SalesReportItemDto> items,
+				List<SalesReportExpenseDto> expenses,
+				@NotBlank(message = "Container No. is required") @Size(max = 100) String containerNumber) {
 			super();
 			this.customerId = customerId;
 			this.procurementType = procurementType;
@@ -43,6 +51,7 @@ public class SalesReportRequestDto {
 			this.notes = notes;
 			this.items = items;
 			this.expenses = expenses;
+			this.containerNumber = containerNumber;
 		}
 
 		public Long getCustomerId() {
@@ -99,6 +108,14 @@ public class SalesReportRequestDto {
 
 		public void setExpenses(List<SalesReportExpenseDto> expenses) {
 			this.expenses = expenses;
+		}
+
+		public String getContainerNumber() {
+			return containerNumber;
+		}
+
+		public void setContainerNumber(String containerNumber) {
+			this.containerNumber = containerNumber;
 		}
 
 		

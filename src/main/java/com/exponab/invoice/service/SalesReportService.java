@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
+
 import com.exponab.invoice.dto.request.SalesReportItemDto;
 import com.exponab.invoice.dto.request.SalesReportRequestDto;
 import com.exponab.invoice.dto.response.SalesReportDetailsResponseDto;
@@ -15,16 +16,13 @@ import com.exponab.invoice.dto.response.SalesReportExpenseResponseDto;
 import com.exponab.invoice.dto.response.SalesReportItemResponseDto;
 import com.exponab.invoice.dto.response.SalesReportResponseDto;
 import com.exponab.invoice.entity.Company;
-import com.exponab.invoice.entity.ExpenseMaster;
 import com.exponab.invoice.entity.PurchaseOrder;
 import com.exponab.invoice.entity.SalesReport;
 import com.exponab.invoice.entity.SalesReportExpense;
 import com.exponab.invoice.entity.SalesReportItem;
 import com.exponab.invoice.entity.TaxMode;
 import com.exponab.invoice.repo.CompanyRepository;
-import com.exponab.invoice.repo.ExpenseMasterRepository;
 import com.exponab.invoice.repo.PurchaseOrderRepo;
-import com.exponab.invoice.repo.SalesReportExpenseRepository;
 import com.exponab.invoice.repo.SalesReportRepository;
 
 import jakarta.transaction.Transactional;
@@ -34,311 +32,218 @@ import jakarta.transaction.Transactional;
 public class SalesReportService {
 
     private final SalesReportRepository repository;
-
     private final CompanyRepository companyRepository;
-
     private final PurchaseOrderRepo purchaseOrderRepo;
-
-    private final ExpenseMasterRepository expenseMasterRepository;
-
-    private final SalesReportExpenseRepository
-            salesReportExpenseRepository;
 
     public SalesReportService(
             SalesReportRepository repository,
             CompanyRepository companyRepository,
-            PurchaseOrderRepo purchaseOrderRepo,
-            ExpenseMasterRepository expenseMasterRepository,
-            SalesReportExpenseRepository salesReportExpenseRepository
+            PurchaseOrderRepo purchaseOrderRepo
     ) {
-
         this.repository = repository;
         this.companyRepository = companyRepository;
         this.purchaseOrderRepo = purchaseOrderRepo;
-        this.expenseMasterRepository =
-                expenseMasterRepository;
-
-        this.salesReportExpenseRepository =
-                salesReportExpenseRepository;
     }
 
-    public SalesReportResponseDto createReport(
-            SalesReportRequestDto request) {
+    // =========================================================
+    // CREATE
+    // =========================================================
+    public SalesReportResponseDto createReport(SalesReportRequestDto request) {
 
-        Company customer = companyRepository.findById(
-                request.getCustomerId())
-                .orElseThrow(() ->
-                        new RuntimeException("Customer not found"));
+        Company customer = companyRepository.findById(request.getCustomerId())
+                .orElseThrow(() -> new RuntimeException("Customer not found"));
 
         SalesReport report = new SalesReport();
-
         report.setReportNumber(generateReportNumber());
-
         report.setReportDate(LocalDate.now());
-
         report.setCustomer(customer);
-
-        report.setProcurementType(
-                request.getProcurementType());
-
+        report.setProcurementType(request.getProcurementType());
         report.setTaxMode(request.getTaxMode());
-
         report.setNotes(request.getNotes());
+        report.setContainerNumber(request.getContainerNumber());
 
         // OPTIONAL PO
         if (request.getPurchaseOrderId() != null) {
-
-            PurchaseOrder po = purchaseOrderRepo.findById(
-                    request.getPurchaseOrderId())
-                    .orElseThrow(() ->
-                            new RuntimeException("PO not found"));
-
+            PurchaseOrder po = purchaseOrderRepo.findById(request.getPurchaseOrderId())
+                    .orElseThrow(() -> new RuntimeException("PO not found"));
             report.setPurchaseOrder(po);
         }
 
-        // =========================
-        // SALES ITEMS
-        // =========================
-
+        // =========================================================
+        // ITEMS + VAT CALCULATION
+        // =========================================================
         List<SalesReportItem> items = new ArrayList<>();
-
-        BigDecimal subtotal = BigDecimal.ZERO;
-
-        BigDecimal totalTax = BigDecimal.ZERO;
+        BigDecimal subtotal = BigDecimal.ZERO;   // sum of NET (vat-exclusive) line amounts
+        BigDecimal totalTax = BigDecimal.ZERO;   // sum of VAT amounts
 
         for (SalesReportItemDto dto : request.getItems()) {
 
             SalesReportItem item = new SalesReportItem();
-
             item.setSalesReport(report);
-
             item.setArticleName(dto.getArticleName());
-
             item.setDescription(dto.getDescription());
-
             item.setQuantity(dto.getQuantity());
-
             item.setUnitPrice(dto.getUnitPrice());
 
-            BigDecimal itemTotal =
-                    dto.getQuantity()
-                    .multiply(dto.getUnitPrice());
+            // Raw line amount (quantity × unit price)
+            BigDecimal lineTotal = dto.getQuantity().multiply(dto.getUnitPrice());
 
-            BigDecimal vatAmount = BigDecimal.ZERO;
+            BigDecimal vatPercent =
+                    dto.getVatPercent() == null ? BigDecimal.ZERO : dto.getVatPercent();
 
-            // WITHOUT VAT
-            if (request.getTaxMode() == TaxMode.WITHOUT_VAT) {
+            BigDecimal vatAmount  = BigDecimal.ZERO;
+            BigDecimal baseAmount = lineTotal;
+            BigDecimal lineGross  = lineTotal;
 
-                vatAmount = BigDecimal.ZERO;
+            TaxMode mode = request.getTaxMode();
+
+            if (mode == TaxMode.WITHOUT_VAT) {
+                // No VAT at all. base = total = lineTotal, vat = 0
+                vatAmount  = BigDecimal.ZERO;
+                baseAmount = lineTotal;
+                lineGross  = lineTotal;
+            }
+            else if (mode == TaxMode.VAT_INCLUDED) {
+                // Business rule: lineTotal IS the inclusive amount.
+                // Break it down as base = lineTotal - vatAmount
+                // where vatAmount = lineTotal × vatPercent / 100
+                // Example: 100 with 5% VAT → vat = 5, base = 95
+                vatAmount  = lineTotal.multiply(vatPercent)
+                                      .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                baseAmount = lineTotal.subtract(vatAmount);
+                lineGross  = lineTotal;   // grand total stays the same as input
+            }
+            else if (mode == TaxMode.MANUAL_VAT) {
+                // VAT added on top of the line amount.
+                // Example: 100 base with 5% VAT → vat = 5, total = 105
+                vatAmount  = lineTotal.multiply(vatPercent)
+                                      .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                baseAmount = lineTotal;
+                lineGross  = lineTotal.add(vatAmount);
             }
 
-            // VAT INCLUDED
-            else if (request.getTaxMode()
-                    == TaxMode.VAT_INCLUDED) {
-
-                BigDecimal vatPercent =
-                        dto.getVatPercent();
-
-                BigDecimal baseAmount =
-                        itemTotal.divide(
-                                BigDecimal.ONE.add(
-                                        vatPercent.divide(
-                                                BigDecimal.valueOf(100),
-                                                2,
-                                                RoundingMode.HALF_UP)),
-                                2,
-                                RoundingMode.HALF_UP);
-
-                vatAmount =
-                        itemTotal.subtract(baseAmount);
-            }
-
-            // MANUAL VAT
-            else if (request.getTaxMode()
-                    == TaxMode.MANUAL_VAT) {
-
-                vatAmount =
-                        itemTotal.multiply(
-                                dto.getVatPercent())
-                        .divide(
-                                BigDecimal.valueOf(100),
-                                2,
-                                RoundingMode.HALF_UP);
-            }
-
-            item.setVatPercent(dto.getVatPercent());
-
+            item.setVatPercent(vatPercent);
             item.setVatAmount(vatAmount);
+            // totalPrice represents the inclusive amount shown in the PDF amount column
+            item.setTotalPrice(lineGross);
 
-            item.setTotalPrice(itemTotal);
-
-            subtotal = subtotal.add(itemTotal);
-
+            subtotal = subtotal.add(baseAmount);
             totalTax = totalTax.add(vatAmount);
 
             items.add(item);
         }
 
         report.setItems(items);
-
         report.setSubtotal(subtotal);
-
         report.setTaxAmount(totalTax);
 
-        BigDecimal grandTotal =
-                subtotal.add(totalTax);
-
+        // Grand total = base + VAT (works for all 3 modes since base + vat
+        // already equals the inclusive amount in VAT_INCLUDED mode)
+        BigDecimal grandTotal = subtotal.add(totalTax);
         report.setGrandTotal(grandTotal);
 
-        // =========================
-        // EXPENSES
-        // =========================
-
-        List<SalesReportExpense> expenseList
-                = new ArrayList<>();
-
-        BigDecimal totalExpenses
-                = BigDecimal.ZERO;
+        // =========================================================
+        // EXPENSES — no more ExpenseMaster lookup
+        // =========================================================
+        List<SalesReportExpense> expenseList = new ArrayList<>();
+        BigDecimal totalExpenses = BigDecimal.ZERO;
 
         if (request.getExpenses() != null) {
 
-            for (SalesReportExpenseDto dto
-                    : request.getExpenses()) {
+            for (SalesReportExpenseDto dto : request.getExpenses()) {
 
-                ExpenseMaster expenseMaster =
-                        expenseMasterRepository
-                        .findById(dto.getExpenseMasterId())
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Expense master not found"));
+                // Skip null/blank entries silently
+                if (dto.getDescription() == null || dto.getDescription().isBlank()) {
+                    continue;
+                }
 
-                BigDecimal amount =
-                        dto.getQuantity()
-                        .multiply(dto.getUnitRate());
+                BigDecimal qty  = dto.getQuantity()  == null ? BigDecimal.ZERO : dto.getQuantity();
+                BigDecimal rate = dto.getUnitRate()  == null ? BigDecimal.ZERO : dto.getUnitRate();
+                BigDecimal amount = qty.multiply(rate);
 
-                SalesReportExpense expense =
-                        new SalesReportExpense();
-
+                SalesReportExpense expense = new SalesReportExpense();
                 expense.setSalesReport(report);
-
-                expense.setExpenseMaster(expenseMaster);
-
-                expense.setDescription(
-                        expenseMaster.getExpenseName());
-
-                expense.setQuantity(
-                        dto.getQuantity());
-
-                expense.setUnitRate(
-                        dto.getUnitRate());
-
+                expense.setDescription(dto.getDescription());
+                expense.setQuantity(qty);
+                expense.setUnitRate(rate);
                 expense.setAmount(amount);
+                // expenseMaster left null — that's fine, column is nullable
 
                 expenseList.add(expense);
-
-                totalExpenses =
-                        totalExpenses.add(amount);
+                totalExpenses = totalExpenses.add(amount);
             }
         }
 
         report.setExpenses(expenseList);
-
         report.setExpenseTotal(totalExpenses);
 
-        // =========================
+        // =========================================================
         // FINAL PAYABLE
-        // =========================
-
-        BigDecimal finalPayable =
-                grandTotal.subtract(totalExpenses);
-
+        // =========================================================
+        BigDecimal finalPayable = grandTotal.subtract(totalExpenses);
         report.setFinalPayable(finalPayable);
 
-        // SAVE
-        SalesReport saved =
-                repository.save(report);
-
+        SalesReport saved = repository.save(report);
         return mapToResponse(saved);
     }
 
     private String generateReportNumber() {
-
         return "SR-" + System.currentTimeMillis();
     }
 
-    private SalesReportResponseDto mapToResponse(
-            SalesReport report) {
+    // =========================================================
+    // MAP TO RESPONSE — setter-based to survive future field changes
+    // =========================================================
+    private SalesReportResponseDto mapToResponse(SalesReport report) {
 
-        return new SalesReportResponseDto(
-
-                report.getId(),
-
-                report.getReportNumber(),
-
-                report.getReportDate(),
-
-                report.getCustomer()
-                        .getCompanyName(),
-
-                report.getProcurementType()
-                        .name(),
-
-                report.getTaxMode()
-                        .name(),
-
-                report.getSubtotal(),
-
-                report.getTaxAmount(),
-
-                report.getGrandTotal(),
-
-                report.getExpenseTotal(),
-
-                report.getFinalPayable()
-        );
+        SalesReportResponseDto dto = new SalesReportResponseDto();
+        dto.setId(report.getId());
+        dto.setReportNumber(report.getReportNumber());
+        dto.setReportDate(report.getReportDate());
+        dto.setCustomerName(report.getCustomer().getCompanyName());
+        dto.setProcurementType(report.getProcurementType().name());
+        dto.setTaxMode(report.getTaxMode().name());
+        dto.setSubtotal(report.getSubtotal());
+        dto.setTaxAmount(report.getTaxAmount());
+        dto.setGrandTotal(report.getGrandTotal());
+        dto.setExpenseTotal(report.getExpenseTotal());
+        dto.setFinalPayable(report.getFinalPayable());
+        dto.setContainerNumber(report.getContainerNumber());
+        return dto;
     }
 
     public SalesReportResponseDto getById(Long id) {
-
         SalesReport report = repository.findById(id)
-                .orElseThrow(() ->
-                        new RuntimeException(
-                                "Sales Report not found"));
-
+                .orElseThrow(() -> new RuntimeException("Sales Report not found"));
         return mapToResponse(report);
     }
 
     public List<SalesReportResponseDto> getAll() {
-
-        return repository.findAll()
-                .stream()
-                .map(this::mapToResponse)
-                .toList();
+        return repository.findAll().stream().map(this::mapToResponse).toList();
     }
-    
+
+    // =========================================================
+    // DETAILS
+    // =========================================================
     public SalesReportDetailsResponseDto getReportDetails(Long id) {
 
         SalesReport report = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sales Report not found"));
 
         SalesReportDetailsResponseDto dto = new SalesReportDetailsResponseDto();
-
         dto.setId(report.getId());
         dto.setReportNumber(report.getReportNumber());
         dto.setReportDate(report.getReportDate());
-
         dto.setCustomerId(report.getCustomer().getId());
         dto.setCustomerName(report.getCustomer().getCompanyName());
         dto.setCustomerEmail(report.getCustomer().getEmail());
-
         dto.setProcurementType(report.getProcurementType().name());
         dto.setTaxMode(report.getTaxMode().name());
-
         dto.setSubtotal(report.getSubtotal());
         dto.setTaxAmount(report.getTaxAmount());
         dto.setGrandTotal(report.getGrandTotal());
-
         dto.setNotes(report.getNotes());
+        dto.setContainerNumber(report.getContainerNumber());
 
         if (report.getPurchaseOrder() != null) {
             dto.setPurchaseOrderId(report.getPurchaseOrder().getId());
@@ -346,11 +251,8 @@ public class SalesReportService {
 
         // ITEMS
         List<SalesReportItemResponseDto> itemList = new ArrayList<>();
-
         for (SalesReportItem item : report.getItems()) {
-
             SalesReportItemResponseDto itemDto = new SalesReportItemResponseDto();
-
             itemDto.setArticleName(item.getArticleName());
             itemDto.setDescription(item.getDescription());
             itemDto.setQuantity(item.getQuantity());
@@ -358,28 +260,29 @@ public class SalesReportService {
             itemDto.setVatPercent(item.getVatPercent());
             itemDto.setVatAmount(item.getVatAmount());
             itemDto.setTotalPrice(item.getTotalPrice());
-
             itemList.add(itemDto);
         }
-
         dto.setItems(itemList);
 
-        // EXPENSES
+        // EXPENSES — null-safe expenseMaster
         List<SalesReportExpenseResponseDto> expenseList = new ArrayList<>();
-
         for (SalesReportExpense expense : report.getExpenses()) {
 
             SalesReportExpenseResponseDto expDto = new SalesReportExpenseResponseDto();
 
-            expDto.setExpenseMasterId(expense.getExpenseMaster().getId());
-            expDto.setExpenseName(expense.getExpenseMaster().getExpenseName());
+            if (expense.getExpenseMaster() != null) {
+                expDto.setExpenseMasterId(expense.getExpenseMaster().getId());
+                expDto.setExpenseName(expense.getExpenseMaster().getExpenseName());
+            } else {
+                expDto.setExpenseMasterId(null);
+                expDto.setExpenseName(expense.getDescription());
+            }
+
             expDto.setQuantity(expense.getQuantity());
             expDto.setUnitRate(expense.getUnitRate());
             expDto.setAmount(expense.getAmount());
-
             expenseList.add(expDto);
         }
-
         dto.setExpenses(expenseList);
 
         return dto;

@@ -29,6 +29,9 @@ public class SalesReportResponseDto {
 	    // NEW
 	    private BigDecimal finalPayable;
 	    
+	    private String containerNumber;
+	    
+	    
 	    public SalesReportResponseDto() {
 			// TODO Auto-generated constructor stub
 		}
@@ -136,6 +139,14 @@ public class SalesReportResponseDto {
 
 		public void setFinalPayable(BigDecimal finalPayable) {
 			this.finalPayable = finalPayable;
+		}
+
+		public String getContainerNumber() {
+			return containerNumber;
+		}
+
+		public void setContainerNumber(String containerNumber) {
+			this.containerNumber = containerNumber;
 		}
 
 		

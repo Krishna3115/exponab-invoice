@@ -11,7 +11,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.exponab.invoice.dto.request.SalesReportRequestDto;
 import com.exponab.invoice.dto.response.ApiResponse;
@@ -119,5 +121,20 @@ public class SalesReportController {
                 )
         );
     }
+    
+    @PostMapping(value = "/{id}/send-mail-with-attachments",
+            consumes = "multipart/form-data")
+public ResponseEntity<ApiResponse<String>> sendMailWithAttachments(
+       @PathVariable("id") Long id,
+       @RequestPart(value = "attachments", required = false) MultipartFile[] attachments) {
+
+   emailService.sendSalesReportWithAttachments(id, attachments);
+
+   return ResponseEntity.ok(
+           new ApiResponse<>(true,
+                   "Sales Report email (with attachments) sent successfully",
+                   "MAIL_SENT")
+   );
+}
 	
 }

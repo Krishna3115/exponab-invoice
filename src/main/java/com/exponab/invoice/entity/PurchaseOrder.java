@@ -73,6 +73,27 @@ public class PurchaseOrder {
     @CreationTimestamp
     private LocalDateTime createdAt;
     
+    @Column(length = 100)
+    private String commodity;
+
+    @Column(length = 200)
+    private String quality;
+
+    @Column(length = 200)
+    private String packaging;
+
+    @Column(length = 50)
+    private String totalQuantity;   // e.g. "28500 KG"
+
+    @Column(length = 100)
+    private String priceNote;       // e.g. "As per Invoice"
+
+    @Column(length = 10)
+    private String currency;        // USD / AED / INR / EUR
+
+    @Column(precision = 10, scale = 4)
+    private java.math.BigDecimal exchangeRate;  // e.g. 3.6730 (USD→AED), nullable
+    
 public PurchaseOrder() {
 	// TODO Auto-generated constructor stub
 }
@@ -80,7 +101,8 @@ public PurchaseOrder() {
 public PurchaseOrder(Long id, String poNumber, LocalDate poDate, Company exporter, String importerName,
 		String countryOfOrigin, String destinationPort, String incoterms, String transportMode, String qualityStandard,
 		String paymentTerms, String deliveryTerms, BigDecimal grandTotal, PurchaseOrderStatus status,
-		List<PurchaseOrderItem> items, LocalDateTime createdAt) {
+		List<PurchaseOrderItem> items, LocalDateTime createdAt, String commodity, String quality, String packaging,
+		String totalQuantity, String priceNote, String currency, BigDecimal exchangeRate) {
 	super();
 	this.id = id;
 	this.poNumber = poNumber;
@@ -98,6 +120,13 @@ public PurchaseOrder(Long id, String poNumber, LocalDate poDate, Company exporte
 	this.status = status;
 	this.items = items;
 	this.createdAt = createdAt;
+	this.commodity = commodity;
+	this.quality = quality;
+	this.packaging = packaging;
+	this.totalQuantity = totalQuantity;
+	this.priceNote = priceNote;
+	this.currency = currency;
+	this.exchangeRate = exchangeRate;
 }
 
 public Long getId() {
@@ -226,6 +255,62 @@ public LocalDateTime getCreatedAt() {
 
 public void setCreatedAt(LocalDateTime createdAt) {
 	this.createdAt = createdAt;
+}
+
+public String getCommodity() {
+	return commodity;
+}
+
+public void setCommodity(String commodity) {
+	this.commodity = commodity;
+}
+
+public String getQuality() {
+	return quality;
+}
+
+public void setQuality(String quality) {
+	this.quality = quality;
+}
+
+public String getPackaging() {
+	return packaging;
+}
+
+public void setPackaging(String packaging) {
+	this.packaging = packaging;
+}
+
+public String getTotalQuantity() {
+	return totalQuantity;
+}
+
+public void setTotalQuantity(String totalQuantity) {
+	this.totalQuantity = totalQuantity;
+}
+
+public String getPriceNote() {
+	return priceNote;
+}
+
+public void setPriceNote(String priceNote) {
+	this.priceNote = priceNote;
+}
+
+public String getCurrency() {
+	return currency;
+}
+
+public void setCurrency(String currency) {
+	this.currency = currency;
+}
+
+public java.math.BigDecimal getExchangeRate() {
+	return exchangeRate;
+}
+
+public void setExchangeRate(java.math.BigDecimal exchangeRate) {
+	this.exchangeRate = exchangeRate;
 }
 
 

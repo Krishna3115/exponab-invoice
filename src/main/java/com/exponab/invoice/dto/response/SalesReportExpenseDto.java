@@ -6,6 +6,8 @@ public class SalesReportExpenseDto {
 
 	 private Long expenseMasterId;
 
+	 private String description;
+	 
 	    private BigDecimal quantity;
 
 	    private BigDecimal unitRate;
@@ -13,16 +15,14 @@ public class SalesReportExpenseDto {
 	    public SalesReportExpenseDto() {
 	    }
 
-	      
-	    
-		public SalesReportExpenseDto(Long expenseMasterId, BigDecimal quantity, BigDecimal unitRate) {
+		public SalesReportExpenseDto(Long expenseMasterId, String description, BigDecimal quantity,
+				BigDecimal unitRate) {
 			super();
 			this.expenseMasterId = expenseMasterId;
+			this.description = description;
 			this.quantity = quantity;
 			this.unitRate = unitRate;
 		}
-
-
 
 		public Long getExpenseMasterId() {
 			return expenseMasterId;
@@ -30,6 +30,14 @@ public class SalesReportExpenseDto {
 
 		public void setExpenseMasterId(Long expenseMasterId) {
 			this.expenseMasterId = expenseMasterId;
+		}
+
+		public String getDescription() {
+			return description;
+		}
+
+		public void setDescription(String description) {
+			this.description = description;
 		}
 
 		public BigDecimal getQuantity() {
@@ -47,6 +55,6 @@ public class SalesReportExpenseDto {
 		public void setUnitRate(BigDecimal unitRate) {
 			this.unitRate = unitRate;
 		}
-	    
-	    
+
+	      	    
 }
